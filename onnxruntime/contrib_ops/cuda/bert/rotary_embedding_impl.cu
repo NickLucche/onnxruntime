@@ -1,11 +1,11 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-#include "contrib_ops/rocm/bert/rotary_embedding_impl.h"
+#include "contrib_ops/cuda/bert/rotary_embedding_impl.h"
 
 namespace onnxruntime {
 namespace contrib {
-namespace rocm {
+namespace cuda {
 
 template <typename T>
 __global__ void RotaryEmbeddingKernel(
@@ -117,6 +117,6 @@ Status LaunchRotaryEmbeddingKernel<half>(
 		const half* sin_buffer,
 	        half* output);
 
-}  // namespace rocm
+}  // namespace cuda
 }  // namespace contrib
 }  // namespace onnxruntime
