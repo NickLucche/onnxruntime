@@ -71,7 +71,7 @@ Status LaunchRotaryEmbeddingKernel(
   // TODO: check head_dim should less than kMaxThreadsPerBlock
   const int blockSize = head_dim;
   const dim3 gridSize(seqlen, num_heads, batch_size);
-  hipStream_t s = static_cast<hipStream_t>(stream->GetHandle());
+  cudaStream_t s = static_cast<cudaStream_t>(stream->GetHandle());
   RotaryEmbeddingKernel<T><<<gridSize, blockSize, 0, s>>>(
 		  input,
 		  pos,
@@ -85,7 +85,7 @@ Status LaunchRotaryEmbeddingKernel(
 		  output
 		  );
 
-  return HIP_CALL(hipGetLastError());
+  return CUDA_CALL(cudaGetLastError());
 }
 
 // instantiation
