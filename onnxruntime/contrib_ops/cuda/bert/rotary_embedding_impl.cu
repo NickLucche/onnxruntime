@@ -32,7 +32,7 @@ __global__ void RotaryEmbeddingKernel(
 
   const int block_offset = batch_offset * num_heads * seqlen + head_offset * seqlen + seqlen_offset;
   const T* in_offset = input + head_dim * block_offset;
-  auto* out_offset = output + head_dim * block_offset;
+  T* out_offset = output + head_dim * block_offset;
 
   int64_t pos_id = pos[batch_offset * seqlen + seqlen_offset];
   if (pos_id >= seqlen_with_past) {
@@ -44,12 +44,12 @@ __global__ void RotaryEmbeddingKernel(
 
   // cos and sin with shape[seqlen, head_dim]
   // cos = cos_ptr[pos_id][i]
-  auto cos = cos_ptr[pos_id * head_dim + i];
-  auto sin = sin_ptr[pos_id * head_dim + i];
-  auto in0 = in_offset[i];
+  T cos = cos_ptr[pos_id * head_dim + i];
+  T sin = sin_ptr[pos_id * head_dim + i];
+  T in0 = in_offset[i];
   const int half_dim = head_dim / 2;
   const int i1 = (i + half_dim) % head_dim;
-  auto in1 = (i1 >= half_dim) ? -in_offset[i1] : in_offset[i1];
+  T in1 = (i1 >= half_dim) ? -in_offset[i1] : in_offset[i1];
 
   out_offset[i] = in0 * cos + in1 * sin;
 }
