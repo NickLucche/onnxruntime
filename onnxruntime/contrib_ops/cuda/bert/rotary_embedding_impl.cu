@@ -31,7 +31,7 @@ __global__ void RotaryEmbeddingKernel(
   const int i = threadIdx.x;
 
   const int block_offset = batch_offset * num_heads * seqlen + head_offset * seqlen + seqlen_offset;
-  const auto* in_offset = input + head_dim * block_offset;
+  const T* in_offset = input + head_dim * block_offset;
   auto* out_offset = output + head_dim * block_offset;
 
   int64_t pos_id = pos[batch_offset * seqlen + seqlen_offset];
