@@ -171,8 +171,8 @@ def parse_arguments():
         nargs="?",
         default=-1,
         type=int,
-        help="Maximum number of NVCC threads to be used in parallel. "
-        "If the optional value is negative or unspecified, the value of --parallel is used.",
+        help="Maximum number of NVCC threads in each parallel job."
+        "If the value is unspecified, it will be computed based on avaiable memory and number of parallel jobs.",
     )
 
     parser.add_argument("--test", action="store_true", help="Run unit tests.")
@@ -875,6 +875,42 @@ def normalize_arg_list(nested_list):
     return [i for j in nested_list for i in j] if nested_list else []
 
 
+def number_of_parallel_jobs(args):
+    return os.cpu_count() if args.parallel == 0 else args.parallel
+
+
+def number_of_nvcc_threads(args):
+    if args.nvcc_threads >= 0:
+        return args.nvcc_threads
+
+    nvcc_threads = 1
+    try:
+        import psutil
+
+        available_memory = psutil.virtual_memory().available
+        if isinstance(available_memory, int) and available_memory > 0:
+            if available_memory > 60 * 1024 * 1024 * 1024:
+                # When avaiable memory is large enough, chance of OOM is small.
+                nvcc_threads = args.parallel
+            else:
+                # NVCC need a lot of memory (up to 6 GB per thread) to compile flash attention and cutlass fmha cu files.
+                # Here we select number of threads to ensure each thread has enough memory. For example,
+                # Standard_NC4as_T4_v3 has 4 CPUs and 28 GB memory. When parallel=3 and nvcc_threads=2,
+                # total nvcc threads is 4 * 2, which is barely able to build without OOM.
+                memory_per_thread = 4 * 1024 * 1024 * 1024
+                num_parallel_jobs = number_of_parallel_jobs(args)
+                nvcc_threads = max(1, int(available_memory / (memory_per_thread * num_parallel_jobs)))
+                print(
+                    f"nvcc_threads={nvcc_threads} to ensure memory per thread >= 4GB for available_memory={available_memory} and num_parallel_jobs={num_parallel_jobs}"
+                )
+    except ImportError:
+        print(
+            "Failed to import psutil. Please `pip install psutil` for better estimation of nvcc threads. Use nvcc_threads=1."
+        )
+
+    return nvcc_threads
+
+
 def generate_build_tree(
     cmake_path,
     source_dir,
@@ -1044,10 +1080,7 @@ def generate_build_tree(
     if args.use_migraphx:
         cmake_args.append("-Donnxruntime_MIGRAPHX_HOME=" + migraphx_home)
     if args.use_cuda:
-        if args.nvcc_threads >= 0:
-            nvcc_threads = args.nvcc_threads
-        else:
-            nvcc_threads = args.parallel
+        nvcc_threads = number_of_nvcc_threads(args)
         cmake_args.append("-Donnxruntime_NVCC_THREADS=" + str(nvcc_threads))
     if args.use_rocm:
         cmake_args.append("-Donnxruntime_ROCM_HOME=" + rocm_home)
@@ -2547,7 +2580,7 @@ def main():
     if args.build:
         if args.parallel < 0:
             raise BuildError(f"Invalid parallel job count: {args.parallel}")
-        num_parallel_jobs = os.cpu_count() if args.parallel == 0 else args.parallel
+        num_parallel_jobs = number_of_parallel_jobs(args)
         build_targets(args, cmake_path, build_dir, configs, num_parallel_jobs, args.target)
 
     if args.test:
